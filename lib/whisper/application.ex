@@ -10,8 +10,6 @@ defmodule Whisper.Application do
     children = [
       # Start the Telemetry supervisor
       WhisperWeb.Telemetry,
-      # Start the Ecto repository
-      Whisper.Repo,
       # Start the PubSub system
       {Phoenix.PubSub, name: Whisper.PubSub},
       # Start Finch
