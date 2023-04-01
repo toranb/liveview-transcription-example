@@ -3,19 +3,7 @@ defmodule WhisperWeb.PageLive do
 
   @impl true
   def mount(_, _, socket) do
-    Nx.default_backend(EXLA.Backend)
-
-    {:ok, whisper} = Bumblebee.load_model({:hf, "openai/whisper-tiny"})
-    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "openai/whisper-tiny"})
-    {:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, "openai/whisper-tiny"})
-
-    serving =
-      Bumblebee.Audio.speech_to_text(whisper, featurizer, tokenizer,
-        max_new_tokens: 100,
-        defn_options: [compiler: EXLA]
-      )
-
-    {:ok, assign(socket, audio: nil, recording: false, task: nil, result: nil, serving: serving)}
+    {:ok, assign(socket, audio: nil, recording: false, task: nil, result: nil)}
   end
 
   @impl true
@@ -37,11 +25,7 @@ defmodule WhisperWeb.PageLive do
   end
 
   @impl true
-  def handle_event(
-        "audio_done",
-        %{"data" => base64_audio},
-        %{assigns: %{serving: serving}} = socket
-      ) do
+  def handle_event("audio_done", %{"data" => base64_audio}, socket) do
     base64_data = String.split(base64_audio, ",", parts: 2) |> List.last()
     decoded_audio = Base.decode64!(base64_data)
     "talk.wav" |> File.write!(decoded_audio)
@@ -49,7 +33,7 @@ defmodule WhisperWeb.PageLive do
     task =
       Task.async(fn ->
         Process.sleep(300)
-        Nx.Serving.run(serving, {:file, "talk.wav"})
+        Nx.Serving.batched_run(WhisperServing, {:file, "talk.wav"})
       end)
 
     {:noreply, assign(socket, recording: false, task: task, result: nil)}

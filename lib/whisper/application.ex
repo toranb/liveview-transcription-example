@@ -7,6 +7,18 @@ defmodule Whisper.Application do
 
   @impl true
   def start(_type, _args) do
+    Nx.default_backend(EXLA.Backend)
+
+    {:ok, whisper} = Bumblebee.load_model({:hf, "openai/whisper-tiny"})
+    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "openai/whisper-tiny"})
+    {:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, "openai/whisper-tiny"})
+
+    serving =
+      Bumblebee.Audio.speech_to_text(whisper, featurizer, tokenizer,
+        max_new_tokens: 100,
+        defn_options: [compiler: EXLA]
+      )
+
     children = [
       # Start the Telemetry supervisor
       WhisperWeb.Telemetry,
@@ -14,6 +26,8 @@ defmodule Whisper.Application do
       {Phoenix.PubSub, name: Whisper.PubSub},
       # Start Finch
       {Finch, name: Whisper.Finch},
+      # Start Nx Serving
+      {Nx.Serving, name: WhisperServing, serving: serving},
       # Start the Endpoint (http/https)
       WhisperWeb.Endpoint
       # Start a worker by calling: Whisper.Worker.start_link(arg)
