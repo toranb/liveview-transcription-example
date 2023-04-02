@@ -42,7 +42,7 @@ Hooks.Demo = {
           });
 
           mediaRecorder.addEventListener("stop", () => {
-            const audioBlob = new Blob(audioChunks, { 'type' : 'audio/wav; codecs=0' });
+            const audioBlob = new Blob(audioChunks);
             const reader = new FileReader();
             reader.readAsDataURL(audioBlob);
             reader.onloadend = () => {
