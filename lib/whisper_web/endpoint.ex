@@ -21,7 +21,7 @@ defmodule WhisperWeb.Endpoint do
     at: "/",
     from: :whisper,
     gzip: false,
-    only: WhisperWeb.static_paths()
+    only: ~w(assets uploads images favicon.ico robots.txt)
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.

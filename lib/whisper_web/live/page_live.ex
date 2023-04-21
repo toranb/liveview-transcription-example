@@ -3,7 +3,13 @@ defmodule WhisperWeb.PageLive do
 
   @impl true
   def mount(_, _, socket) do
-    {:ok, assign(socket, audio: nil, recording: false, task: nil, result: nil)}
+    socket =
+      socket
+      |> assign(audio: nil, recording: false, task: nil)
+      |> allow_upload(:audio, accept: :any, progress: &handle_progress/3, auto_upload: true)
+      |> stream(:segments, [], dom_id: &"ss-#{&1.ss}")
+
+    {:ok, socket}
   end
 
   @impl true
@@ -14,54 +20,71 @@ defmodule WhisperWeb.PageLive do
 
   @impl true
   def handle_event("stop", _value, %{assigns: %{recording: recording}} = socket) do
-    socket =
-      if recording do
-        socket |> push_event("stop", %{})
-      else
-        socket
-      end
-
+    socket = if recording, do: socket |> push_event("stop", %{}), else: socket
     {:noreply, assign(socket, recording: false)}
   end
 
   @impl true
-  def handle_event("audio_done", %{"data" => base64_audio}, socket) do
-    base64_data = String.split(base64_audio, ",", parts: 2) |> List.last()
-    decoded_audio = Base.decode64!(base64_data)
-    "talk.wav" |> File.write!(decoded_audio)
-
-    task =
-      Task.async(fn ->
-        Process.sleep(300)
-        Nx.Serving.batched_run(WhisperServing, {:file, "talk.wav"})
-      end)
-
-    {:noreply, assign(socket, recording: false, task: task, result: nil)}
+  def handle_event("noop", %{}, socket) do
+    # We need phx-change and phx-submit on the form for live uploads
+    {:noreply, socket}
   end
 
   @impl true
-  def handle_info({ref, x}, socket) when socket.assigns.task.ref == ref do
-    result =
-      x.results
-      |> Enum.reduce("", fn r, acc -> acc <> "#{r.text}" end)
+  def handle_info({ref, results}, socket) when socket.assigns.task.ref == ref do
+    socket = socket |> assign(task: nil)
 
-    {:noreply, assign(socket, task: nil, result: result)}
+    socket =
+      results
+      |> Enum.reduce(socket, fn {_duration, ss, text}, socket ->
+        socket |> stream_insert(:segments, %{ss: ss, text: text})
+      end)
+
+    {:noreply, socket}
   end
 
+  @impl true
   def handle_info(_, socket) do
     {:noreply, socket}
   end
+
+  def handle_progress(:audio, entry, socket) when entry.done? do
+    path =
+      consume_uploaded_entry(socket, entry, fn upload ->
+        dest = Path.join(["priv", "static", "uploads", Path.basename(upload.path)])
+        File.cp!(upload.path, dest)
+        {:ok, dest}
+      end)
+
+    {:ok, %{duration: duration}} = Whisper.MP3Stat.parse(path)
+
+    task =
+      Whisper.Audio.speech_to_text(duration, path, 20, fn ss, text ->
+        {duration, ss, text}
+      end)
+
+    {:noreply, assign(socket, task: task)}
+  end
+
+  def handle_progress(_name, _entry, socket), do: {:noreply, socket}
 
   @impl true
   def render(assigns) do
     ~H"""
     <div class="h-screen">
-      <div :if={@result} class="pt-4">
-        <div class="flex w-full justify-center items-center text-blue-400 font-bold">
-          <%= @result %>
+      <div id="transcript" phx-update="stream" class="pt-4">
+        <div
+          :for={{id, segment} <- @streams.segments}
+          id={id}
+          class="flex w-full justify-center items-center text-blue-400 font-bold"
+        >
+          <%= segment.text %>
         </div>
       </div>
       <div class="flex h-screen w-full justify-center items-center">
+        <form phx-change="noop" phx-submit="noop" class="hidden">
+          <.live_file_input upload={@uploads.audio} />
+        </form>
         <div id="mic-element" class="flex h-20 w-20 rounded-full bg-gray-700 p-2" phx-hook="Demo">
           <div
             :if={@task}

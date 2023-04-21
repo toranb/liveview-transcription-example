@@ -43,12 +43,7 @@ Hooks.Demo = {
 
           mediaRecorder.addEventListener("stop", () => {
             const audioBlob = new Blob(audioChunks);
-            const reader = new FileReader();
-            reader.readAsDataURL(audioBlob);
-            reader.onloadend = () => {
-              const base64data = reader.result;
-              this.pushEvent("audio_done", {data: base64data});
-            }
+            this.upload("audio", [audioBlob]);
           });
 
           mediaRecorder.start();

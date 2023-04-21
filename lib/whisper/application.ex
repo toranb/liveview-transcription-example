@@ -20,6 +20,7 @@ defmodule Whisper.Application do
       )
 
     children = [
+      {Task.Supervisor, name: Whisper.TaskSupervisor},
       # Start the Telemetry supervisor
       WhisperWeb.Telemetry,
       # Start the PubSub system
