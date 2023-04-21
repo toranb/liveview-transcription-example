@@ -50,7 +50,7 @@ defmodule Whisper.MixProject do
       {:gettext, "~> 0.20"},
       {:jason, "~> 1.2"},
       {:plug_cowboy, "~> 2.5"},
-      {:bumblebee, "~> 0.2.0"},
+      {:bumblebee, "~> 0.3.0"},
       {:exla, "~> 0.5.2"},
       {:nx, "~> 0.5.3"}
     ]
