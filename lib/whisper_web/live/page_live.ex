@@ -56,7 +56,7 @@ defmodule WhisperWeb.PageLive do
         {:ok, dest}
       end)
 
-    {:ok, %{duration: duration}} = Whisper.MP3Stat.parse(path)
+    {:ok, %{duration: duration}} = Mp3Duration.parse(path)
 
     task =
       Whisper.Audio.speech_to_text(duration, path, 20, fn ss, text ->
